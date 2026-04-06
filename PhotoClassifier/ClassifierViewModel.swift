@@ -13,7 +13,7 @@ final class ClassifierViewModel: ObservableObject {
     @Published var availableTags: [String] = []
     @Published var filterTag: String?
     @Published var isMoving = false
-    @Published var statusMessage = "选择一个文件夹开始分类"
+    @Published var statusMessage = "选择一个文件夹开始归类"
     @Published var viewMode: ViewMode = .grid
     @Published var detailIndex: Int = 0
     @Published var detailToast: String?
@@ -38,7 +38,7 @@ final class ClassifierViewModel: ObservableObject {
 
     var filteredPhotos: [PhotoItem] {
         guard let filter = filterTag else { return photos }
-        if filter == "未分类" { return photos.filter { $0.tag == nil } }
+        if filter == "未归类" { return photos.filter { $0.tag == nil } }
         return photos.filter { $0.tag == filter }
     }
 
@@ -47,7 +47,7 @@ final class ClassifierViewModel: ObservableObject {
         for tag in availableTags {
             result.append((tag, photos.filter { $0.tag == tag }.count))
         }
-        result.append(("未分类", photos.filter { $0.tag == nil }.count))
+        result.append(("未归类", photos.filter { $0.tag == nil }.count))
         return result
     }
 
@@ -64,7 +64,7 @@ final class ClassifierViewModel: ObservableObject {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.message = "选择照片根目录（子目录为标签分类）"
+        panel.message = "选择照片根目录（子目录为标签归类）"
         panel.prompt = "选择"
 
         if panel.runModal() == .OK, let url = panel.url {
@@ -139,7 +139,7 @@ final class ClassifierViewModel: ObservableObject {
                     self.availableTags = tags
                     self.photos = allPhotos
                     let untagged = allPhotos.filter { $0.tag == nil }.count
-                    self.statusMessage = "已加载 \(allPhotos.count) 张照片，\(untagged) 张未分类 — \(directory.lastPathComponent)"
+                    self.statusMessage = "已加载 \(allPhotos.count) 张照片，\(untagged) 张未归类 — \(directory.lastPathComponent)"
                     completion?()
                 }
             } catch {

@@ -214,7 +214,7 @@ struct PhotoDetailView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "questionmark.circle")
                         .font(.system(size: 12))
-                    Text("未分类")
+                    Text("未归类")
                 }
                 .font(.callout)
                 .padding(.horizontal, 14)
@@ -244,7 +244,7 @@ struct PhotoDetailView: View {
 
             Spacer()
 
-            Text("← → 切换  ⌘+数字 分类  ESC 退出")
+            Text("← → 切换  ⌘+数字 归类  ESC 退出")
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.3))
         }

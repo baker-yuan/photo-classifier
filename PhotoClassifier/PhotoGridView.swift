@@ -46,7 +46,7 @@ struct PhotoGridView: View {
             Image(systemName: vm.photos.isEmpty ? "photo.stack" : "line.3.horizontal.decrease.circle")
                 .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
-            Text(vm.photos.isEmpty ? "文件夹中没有找到图片" : "当前分类下没有照片")
+            Text(vm.photos.isEmpty ? "文件夹中没有找到图片" : "当前归类下没有照片")
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

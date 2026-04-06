@@ -75,7 +75,7 @@ struct WelcomeView: View {
 
             VStack(spacing: 6) {
                 Text("⌘O 打开文件夹")
-                Text("子目录自动识别为标签分类")
+                Text("子目录自动识别为标签归类")
                 Text("双击照片进入沉浸式打标")
             }
             .font(.caption)
@@ -187,7 +187,7 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selection) {
-            Section("分类目录") {
+            Section("归类目录") {
                 ForEach(vm.tagCounts, id: \.tag) { item in
                     SidebarRow(tag: item.tag, count: item.count)
                         .tag(item.tag)
@@ -208,11 +208,11 @@ struct SidebarView: View {
                 ShortcutRow(key: "双击", desc: "进入沉浸打标")
                 ShortcutRow(key: "⌘+点击", desc: "多选照片")
                 ShortcutRow(key: "多选按钮", desc: "切换多选模式")
-                ShortcutRow(key: "右键", desc: "快速分类菜单")
+                ShortcutRow(key: "右键", desc: "快速归类菜单")
             }
             Section("沉浸模式") {
                 ShortcutRow(key: "← →", desc: "切换上/下一张")
-                ShortcutRow(key: "⌘1~9", desc: "数字键快速分类")
+                ShortcutRow(key: "⌘1~9", desc: "数字键快速归类")
                 ShortcutRow(key: "Space", desc: "显示/隐藏控件")
                 ShortcutRow(key: "ESC", desc: "退出沉浸模式")
             }
@@ -251,7 +251,7 @@ struct SidebarRow: View {
         case "全部": return "photo.on.rectangle"
         case "保留": return "checkmark.circle.fill"
         case "删除": return "trash.circle.fill"
-        case "未分类": return "questionmark.circle"
+        case "未归类": return "questionmark.circle"
         default: return "folder.circle.fill"
         }
     }
@@ -261,7 +261,7 @@ struct SidebarRow: View {
         case "全部": return .primary
         case "保留": return .green
         case "删除": return .red
-        case "未分类": return .gray
+        case "未归类": return .gray
         default:
             let colors: [Color] = [.blue, .purple, .orange, .teal, .indigo, .pink, .mint, .cyan]
             return colors[abs(tag.hashValue) % colors.count]
@@ -385,7 +385,7 @@ struct StatusBar: View {
                 .foregroundStyle(.secondary)
             Spacer()
             if !vm.photos.isEmpty {
-                Text("单击选中 | 双击沉浸打标 | ⌘+点击多选 | 右键快速分类")
+                Text("单击选中 | 双击沉浸浏览 | ⌘+点击多选 | 右键快速归类")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
