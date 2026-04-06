@@ -58,7 +58,7 @@ struct WelcomeView: View {
                 .font(.system(size: 72))
                 .foregroundStyle(.secondary)
 
-            Text("照片分类")
+            Text("图片整理")
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
