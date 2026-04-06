@@ -73,6 +73,54 @@ struct WelcomeView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
 
+            if !vm.recentDirectories.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("最近打开")
+                        .font(.callout)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(vm.recentDirectories, id: \.path) { url in
+                        HStack(spacing: 8) {
+                            Button(action: { vm.openRecent(url) }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "folder.fill")
+                                        .foregroundStyle(.blue)
+                                        .font(.caption)
+                                    Text(url.lastPathComponent)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.primary)
+
+                            Text(url.deletingLastPathComponent().path)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                                .truncationMode(.head)
+
+                            Spacer()
+
+                            Button(action: { vm.removeFromRecent(url) }) {
+                                Image(systemName: "xmark")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.primary.opacity(0.04))
+                        )
+                    }
+                }
+                .frame(width: 360)
+            }
+
             VStack(spacing: 6) {
                 Text("⌘O 打开文件夹")
                 Text("子目录自动识别为标签归类")
@@ -259,12 +307,8 @@ struct SidebarRow: View {
     private var color: Color {
         switch tag {
         case "全部": return .primary
-        case "保留": return .green
-        case "删除": return .red
         case "未归类": return .gray
-        default:
-            let colors: [Color] = [.blue, .purple, .orange, .teal, .indigo, .pink, .mint, .cyan]
-            return colors[abs(tag.hashValue) % colors.count]
+        default: return deterministicTagColor(tag)
         }
     }
 }
@@ -358,13 +402,7 @@ struct QuickTagButton: View {
     }
 
     private var tagColor: Color {
-        switch tag {
-        case "保留": return .green
-        case "删除": return .red
-        default:
-            let colors: [Color] = [.blue, .purple, .orange, .teal, .indigo, .pink]
-            return colors[abs(tag.hashValue) % colors.count]
-        }
+        deterministicTagColor(tag)
     }
 }
 

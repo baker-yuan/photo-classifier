@@ -18,20 +18,86 @@ final class ClassifierViewModel: ObservableObject {
     @Published var detailIndex: Int = 0
     @Published var detailToast: String?
     @Published var isSelectionMode = false
+    @Published var recentDirectories: [URL] = []
+
+    private static let recentBookmarksKey = "recentDirectoryBookmarks"
+    private static let maxRecent = 10
 
     private var isDetailTagging = false
     private var toastGeneration = 0
+    private var accessedSecurityScopedURL: URL?
 
     private let imageExtensions: Set<String> = [
         "jpg", "jpeg", "png", "heic", "heif", "tiff", "tif", "bmp", "gif", "webp", "raw", "cr2", "nef", "arw"
     ]
 
-    private let videoExtensions: Set<String> = [
-        "mp4", "mov", "m4v", "avi", "mkv", "wmv", "flv", "webm", "3gp", "mts", "ts"
-    ]
-
     private var supportedExtensions: Set<String> {
-        imageExtensions.union(videoExtensions)
+        imageExtensions.union(PhotoItem.videoExtensions)
+    }
+
+    init() {
+        recentDirectories = Self.loadRecentDirectories()
+    }
+
+    // MARK: - Recent Directories
+
+    private static func loadRecentDirectories() -> [URL] {
+        guard let bookmarks = UserDefaults.standard.array(forKey: recentBookmarksKey) as? [Data] else { return [] }
+        var urls: [URL] = []
+        var updatedBookmarks: [Data] = []
+        var needsSave = false
+        for data in bookmarks {
+            var isStale = false
+            if let url = try? URL(resolvingBookmarkData: data, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &isStale) {
+                urls.append(url)
+                if isStale, let newData = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil) {
+                    updatedBookmarks.append(newData)
+                    needsSave = true
+                } else {
+                    updatedBookmarks.append(data)
+                }
+            } else {
+                needsSave = true
+            }
+        }
+        if needsSave {
+            UserDefaults.standard.set(updatedBookmarks, forKey: recentBookmarksKey)
+        }
+        return urls
+    }
+
+    private func addToRecent(_ url: URL) {
+        recentDirectories.removeAll { $0.path == url.path }
+        recentDirectories.insert(url, at: 0)
+        if recentDirectories.count > Self.maxRecent {
+            recentDirectories = Array(recentDirectories.prefix(Self.maxRecent))
+        }
+        let bookmarks = recentDirectories.compactMap {
+            try? $0.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+        }
+        UserDefaults.standard.set(bookmarks, forKey: Self.recentBookmarksKey)
+    }
+
+    func removeFromRecent(_ url: URL) {
+        recentDirectories.removeAll { $0.path == url.path }
+        let bookmarks = recentDirectories.compactMap {
+            try? $0.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+        }
+        UserDefaults.standard.set(bookmarks, forKey: Self.recentBookmarksKey)
+    }
+
+    func openRecent(_ url: URL) {
+        accessedSecurityScopedURL?.stopAccessingSecurityScopedResource()
+        accessedSecurityScopedURL = nil
+        if url.startAccessingSecurityScopedResource() {
+            accessedSecurityScopedURL = url
+        }
+        addToRecent(url)
+        loadDirectory(url)
+    }
+
+    deinit {
+        accessedSecurityScopedURL?.stopAccessingSecurityScopedResource()
     }
 
     // MARK: - Computed
@@ -68,6 +134,9 @@ final class ClassifierViewModel: ObservableObject {
         panel.prompt = "选择"
 
         if panel.runModal() == .OK, let url = panel.url {
+            accessedSecurityScopedURL?.stopAccessingSecurityScopedResource()
+            accessedSecurityScopedURL = nil
+            addToRecent(url)
             loadDirectory(url)
         }
     }
@@ -395,9 +464,13 @@ final class ClassifierViewModel: ObservableObject {
 
                 DispatchQueue.main.async {
                     guard let self = self else { return }
-                    self.photos[photoIdx].url = dest
-                    self.photos[photoIdx].fileName = dest.lastPathComponent
-                    self.photos[photoIdx].tag = tag
+                    guard let freshIdx = self.photos.firstIndex(where: { $0.id == photo.id }) else {
+                        self.isDetailTagging = false
+                        return
+                    }
+                    self.photos[freshIdx].url = dest
+                    self.photos[freshIdx].fileName = dest.lastPathComponent
+                    self.photos[freshIdx].tag = tag
                     self.statusMessage = "已标记为「\(tag)」"
                     self.showDetailToast(tag)
 
@@ -440,9 +513,13 @@ final class ClassifierViewModel: ObservableObject {
 
                 DispatchQueue.main.async {
                     guard let self = self else { return }
-                    self.photos[photoIdx].url = dest
-                    self.photos[photoIdx].fileName = dest.lastPathComponent
-                    self.photos[photoIdx].tag = nil
+                    guard let freshIdx = self.photos.firstIndex(where: { $0.id == photo.id }) else {
+                        self.isDetailTagging = false
+                        return
+                    }
+                    self.photos[freshIdx].url = dest
+                    self.photos[freshIdx].fileName = dest.lastPathComponent
+                    self.photos[freshIdx].tag = nil
                     self.statusMessage = "已移回根目录"
                     self.showDetailToast("根目录")
 

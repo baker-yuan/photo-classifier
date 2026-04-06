@@ -9,7 +9,12 @@ struct PhotoDetailView: View {
     @State private var fullImage: NSImage?
     @State private var player: AVPlayer?
     @State private var showControls = true
-    @State private var controlTimer: Timer?
+    @State private var currentTime: Double = 0
+    @State private var duration: Double = 0
+    @State private var isPlaying: Bool = true
+    @State private var isSeeking: Bool = false
+    @State private var timeObserver: Any?
+    @State private var endObserver: NSObjectProtocol?
 
     var body: some View {
         ZStack {
@@ -33,6 +38,7 @@ struct PhotoDetailView: View {
             toastOverlay
         }
         .onAppear { loadMedia() }
+        .onDisappear { cleanupPlayer() }
         // Watch the actual photo identity, not just the index.
         // This correctly reloads media when:
         //  - User navigates (detailIndex changes → different photo id)
@@ -85,8 +91,7 @@ struct PhotoDetailView: View {
     private var mediaContent: some View {
         if let photo = vm.currentDetailPhoto, photo.isVideo {
             if let player = player {
-                VideoPlayer(player: player)
-                    .onAppear { player.play() }
+                PlayerView(player: player)
             } else {
                 ProgressView()
                     .tint(.white)
@@ -128,13 +133,13 @@ struct PhotoDetailView: View {
                     .frame(width: 80)
                     .contentShape(Rectangle())
                     .overlay(alignment: .center) {
-                        if showControls && vm.detailIndex < vm.filteredPhotos.count - 1 {
+                        if showControls && vm.filteredPhotos.count > 1 && vm.detailIndex < vm.filteredPhotos.count - 1 {
                             navArrow(systemName: "chevron.right")
                         }
                     }
             }
             .buttonStyle(.plain)
-            .disabled(vm.detailIndex >= vm.filteredPhotos.count - 1)
+            .disabled(vm.filteredPhotos.count <= 1 || vm.detailIndex >= vm.filteredPhotos.count - 1)
         }
         .frame(maxHeight: .infinity)
     }
@@ -229,24 +234,29 @@ struct PhotoDetailView: View {
     // MARK: - Bottom Bar
 
     private var bottomBar: some View {
-        HStack(spacing: 12) {
-            Text("移动到:")
-                .font(.callout)
-                .foregroundStyle(.white.opacity(0.6))
+        VStack(spacing: 8) {
+            if vm.currentDetailPhoto?.isVideo == true {
+                videoProgressBar
+            }
+            HStack(spacing: 12) {
+                Text("移动到:")
+                    .font(.callout)
+                    .foregroundStyle(.white.opacity(0.6))
 
-            tagButtonsRow
+                tagButtonsRow
 
-            Divider()
-                .frame(height: 24)
-                .overlay(Color.white.opacity(0.2))
+                Divider()
+                    .frame(height: 24)
+                    .overlay(Color.white.opacity(0.2))
 
-            moveToRootBtn
+                moveToRootBtn
 
-            Spacer()
+                Spacer()
 
-            Text("← → 切换  ⌘+数字 归类  ESC 退出")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.3))
+                Text("← → 切换  ⌘+数字 归类  ESC 退出")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.3))
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
@@ -283,6 +293,62 @@ struct PhotoDetailView: View {
         .opacity(vm.currentDetailPhoto?.tag == nil ? 0.3 : 1)
     }
 
+    // MARK: - Video Progress Bar
+
+    private var videoProgressBar: some View {
+        HStack(spacing: 10) {
+            Button(action: togglePlayPause) {
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+
+            Text(formatTime(currentTime))
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(width: 45, alignment: .trailing)
+
+            Slider(value: $currentTime, in: 0...max(duration, 1)) { editing in
+                isSeeking = editing
+                if editing {
+                    player?.pause()
+                } else {
+                    player?.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600),
+                                 toleranceBefore: .zero, toleranceAfter: .zero)
+                    if isPlaying { player?.play() }
+                }
+            }
+            .tint(.white)
+
+            Text(formatTime(duration))
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(width: 45, alignment: .leading)
+        }
+    }
+
+    private func togglePlayPause() {
+        guard let player = player else { return }
+        if isPlaying {
+            player.pause()
+        } else {
+            player.play()
+        }
+        isPlaying.toggle()
+    }
+
+    private func formatTime(_ seconds: Double) -> String {
+        guard seconds.isFinite && seconds >= 0 else { return "0:00" }
+        let total = Int(seconds)
+        let m = total / 60
+        let s = total % 60
+        return String(format: "%d:%02d", m, s)
+    }
+
     // MARK: - Key Handling
 
     private func handleKey(_ key: String) {
@@ -300,10 +366,21 @@ struct PhotoDetailView: View {
         }
     }
 
-    private func closeDetail() {
+    private func cleanupPlayer() {
+        if let observer = timeObserver {
+            player?.removeTimeObserver(observer)
+            timeObserver = nil
+        }
+        if let observer = endObserver {
+            NotificationCenter.default.removeObserver(observer)
+            endObserver = nil
+        }
         player?.pause()
         player = nil
-        controlTimer?.invalidate()
+    }
+
+    private func closeDetail() {
+        cleanupPlayer()
         vm.closeDetail()
     }
 
@@ -315,19 +392,43 @@ struct PhotoDetailView: View {
 
     private func resetControlTimer() {
         showControls = true
-        controlTimer?.invalidate()
     }
 
     // MARK: - Helpers
 
     private func loadMedia() {
         fullImage = nil
-        player?.pause()
-        player = nil
+        cleanupPlayer()
+        currentTime = 0
+        duration = 0
+        isPlaying = true
         guard let photo = vm.currentDetailPhoto else { return }
 
         if photo.isVideo {
-            player = AVPlayer(url: photo.url)
+            let newPlayer = AVPlayer(url: photo.url)
+            player = newPlayer
+
+            let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
+            timeObserver = newPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak newPlayer] time in
+                guard !self.isSeeking else { return }
+                self.currentTime = time.seconds
+                if let item = newPlayer?.currentItem, item.status == .readyToPlay {
+                    let dur = item.duration.seconds
+                    if dur.isFinite && dur > 0 {
+                        self.duration = dur
+                    }
+                }
+            }
+
+            endObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: newPlayer.currentItem,
+                queue: .main
+            ) { _ in
+                self.isPlaying = false
+            }
+
+            newPlayer.play()
         } else {
             let url = photo.url
             DispatchQueue.global(qos: .userInitiated).async {
@@ -338,13 +439,7 @@ struct PhotoDetailView: View {
     }
 
     private func tagColor(_ t: String) -> Color {
-        switch t {
-        case "保留": return .green
-        case "删除": return .red
-        default:
-            let colors: [Color] = [.blue, .purple, .orange, .teal, .indigo, .pink]
-            return colors[abs(t.hashValue) % colors.count]
-        }
+        deterministicTagColor(t)
     }
 }
 
@@ -401,13 +496,25 @@ struct ImmersiveTagButton: View {
     }
 
     private var btnColor: Color {
-        switch tag {
-        case "保留": return .green
-        case "删除": return .red
-        default:
-            let colors: [Color] = [.blue, .purple, .orange, .teal, .indigo, .pink]
-            return colors[abs(tag.hashValue) % colors.count]
-        }
+        deterministicTagColor(tag)
+    }
+}
+
+// MARK: - AVPlayerView Wrapper (AppKit)
+
+struct PlayerView: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.player = player
+        view.controlsStyle = .none
+        view.showsFullScreenToggleButton = false
+        return view
+    }
+
+    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+        nsView.player = player
     }
 }
 

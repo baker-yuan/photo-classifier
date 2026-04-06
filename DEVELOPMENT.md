@@ -153,6 +153,21 @@ private let videoExtensions: Set<String> = [
 
 同时更新 `PhotoItem` 中的 `videoExtensions`。
 
+## 构建与安装
+
+### 命令行构建
+
+```bash
+# Release 构建
+xcodebuild -scheme PhotoClassifier -configuration Release clean build
+
+# 安装到 /Applications（先删除旧版本，避免 Launchpad 出现重复图标）
+rm -rf /Applications/图片整理.app
+cp -R ~/Library/Developer/Xcode/DerivedData/PhotoClassifier-hkmulxyckkhjjlextzqnuinyawur/Build/Products/Release/图片整理.app /Applications/
+```
+
+> **注意：** 安装前必须先删除旧的 `/Applications/图片整理.app`，否则可能在 Launchpad 中出现两个图标。如果已经出现重复，执行 `defaults write com.apple.dock ResetLaunchPad -bool true && killall Dock` 重置 Launchpad 缓存。
+
 ## 测试
 
 目前项目未包含单元测试。建议的测试方向：

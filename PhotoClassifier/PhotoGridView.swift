@@ -4,7 +4,7 @@ struct PhotoGridView: View {
     @EnvironmentObject var vm: ClassifierViewModel
 
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: vm.thumbnailSize, maximum: vm.thumbnailSize + 40), spacing: 8)]
+        [GridItem(.adaptive(minimum: vm.thumbnailSize, maximum: vm.thumbnailSize + 40), spacing: 2)]
     }
 
     var body: some View {
@@ -12,7 +12,7 @@ struct PhotoGridView: View {
             if vm.filteredPhotos.isEmpty {
                 emptyState
             } else {
-                LazyVGrid(columns: columns, spacing: 8) {
+                LazyVGrid(columns: columns, spacing: 2) {
                     ForEach(vm.filteredPhotos) { photo in
                         ThumbnailView(
                             photo: photo,
@@ -34,7 +34,7 @@ struct PhotoGridView: View {
                         }
                     }
                 }
-                .padding(12)
+                .padding(4)
             }
         }
         .background(Color(nsColor: .controlBackgroundColor))
@@ -97,51 +97,39 @@ struct ThumbnailView: View {
     @State private var isHovering = false
 
     var body: some View {
-        VStack(spacing: 4) {
-            ZStack(alignment: .topTrailing) {
-                thumbnailImage
-                    .frame(width: size, height: size)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        if photo.isVideo {
-                            ZStack {
-                                Circle()
-                                    .fill(.black.opacity(0.5))
-                                    .frame(width: 32, height: 32)
-                                Image(systemName: "play.fill")
-                                    .foregroundStyle(.white)
-                                    .font(.system(size: 14))
-                            }
+        ZStack(alignment: .topTrailing) {
+            thumbnailImage
+                .frame(width: size, height: size)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay {
+                    if photo.isVideo {
+                        ZStack {
+                            Circle()
+                                .fill(.black.opacity(0.5))
+                                .frame(width: 32, height: 32)
+                            Image(systemName: "play.fill")
+                                .foregroundStyle(.white)
+                                .font(.system(size: 14))
                         }
                     }
-
-                if let tag = photo.tag {
-                    tagBadge(tag)
                 }
 
-                if isSelected {
-                    selectionBorder
-                }
-
-                if showCheckbox {
-                    checkboxOverlay
-                }
+            if let tag = photo.tag {
+                tagBadge(tag)
             }
-            .shadow(color: isSelected ? Color.accentColor.opacity(0.3) : Color.black.opacity(0.08),
-                    radius: isSelected ? 4 : 2, y: isSelected ? 0 : 1)
-            .scaleEffect(isHovering ? 1.03 : 1.0)
-            .animation(.easeOut(duration: 0.15), value: isHovering)
-            .onHover { isHovering = $0 }
 
-            if size >= 100 {
-                Text(photo.fileName)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .frame(width: size)
+            if isSelected {
+                selectionBorder
+            }
+
+            if showCheckbox {
+                checkboxOverlay
             }
         }
+        .shadow(color: isSelected ? Color.accentColor.opacity(0.3) : Color.black.opacity(0.08),
+                radius: isSelected ? 4 : 2, y: isSelected ? 0 : 1)
+        .onHover { isHovering = $0 }
         .onAppear { loadThumbnail() }
         .onChange(of: size) { _ in loadThumbnail() }
     }
@@ -153,7 +141,8 @@ struct ThumbnailView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: size, height: size)
-                .clipped()
+                .scaleEffect(isHovering ? 1.08 : 1.0)
+                .animation(.easeOut(duration: 0.2), value: isHovering)
         } else {
             Rectangle()
                 .fill(Color.gray.opacity(0.1))
@@ -210,12 +199,6 @@ struct ThumbnailView: View {
     }
 
     private func badgeColor(_ tag: String) -> Color {
-        switch tag {
-        case "保留": return .green
-        case "删除": return .red
-        default:
-            let colors: [Color] = [.blue, .purple, .orange, .teal, .indigo, .pink]
-            return colors[abs(tag.hashValue) % colors.count]
-        }
+        deterministicTagColor(tag)
     }
 }
