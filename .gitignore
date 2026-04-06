@@ -35,3 +35,4 @@ Pods/
 # Misc
 *.zip
 *.tar.gz
+release/

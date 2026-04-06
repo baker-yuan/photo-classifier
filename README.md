@@ -12,26 +12,28 @@
 - **目录即标签** — 子文件夹名称自动识别为分类标签，移动文件即完成分类
 - **全屏沉浸打标** — 点击照片进入全屏查看模式，使用快捷键极速分类
 - **视频支持** — 支持 MP4、MOV、MKV 等常见视频格式的预览和分类
-- **批量操作** — ⌘+点击多选照片，一次性批量移动到目标分类
+- **批量操作** — 多选模式一键切换，单击即可选中，也支持 ⌘+点击多选，批量移动到目标分类
 - **实时反馈** — 打标后即时显示 Toast 提示和标签状态变化
 - **键盘优先** — 全程键盘操作，⌘+数字快速分类，方向键切换照片
 - **原生体验** — 纯 SwiftUI + AppKit 开发，无第三方依赖
 
 ## 截图
 
-> 欢迎提交截图 PR
+| 网格浏览 | 分类整理 |
+|:---:|:---:|
+| ![网格浏览模式](docs/images/use-01.png) | ![分类整理效果](docs/images/user-02.png) |
 
 ## 安装
 
 ### 方式一：直接下载
 
-从 [Releases](../../releases) 页面下载最新的 `PhotoClassifier.zip`，解压后将 `照片分类.app` 拖入"应用程序"文件夹。
+从 [Releases](../../releases) 页面下载最新的 `PhotoClassifier.zip`，解压后将 `PhotoClassifier.app` 拖入"应用程序"文件夹。
 
 ### 方式二：从源码构建
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/photo_view.git
-cd photo_view
+git clone https://github.com/baker-yuan/photo-classifier.git
+cd photo-classifier
 open PhotoClassifier.xcodeproj
 ```
 
@@ -80,6 +82,7 @@ open PhotoClassifier.xcodeproj
 | `⌘A` | 全选照片 | 网格 |
 | `⌘D` | 取消选择 | 网格 |
 | `⌘+点击` | 多选照片 | 网格 |
+| `多选按钮` | 切换多选模式，单击选中 | 网格 |
 | `右键` | 快速分类菜单 | 网格 |
 | `点击照片` | 进入沉浸打标 | 网格 |
 | `← →` | 上/下一张 | 沉浸 |

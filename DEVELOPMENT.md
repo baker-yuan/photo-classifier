@@ -51,6 +51,7 @@
 - `@Published var viewMode: ViewMode` — `.grid` 或 `.detail`
 - `@Published var detailIndex: Int` — 当前查看的照片索引
 - `@Published var detailToast: String?` — 打标后的 Toast 提示
+- `@Published var isSelectionMode: Bool` — 多选模式开关（开启后单击即选中）
 - `private var isDetailTagging: Bool` — 防止并发打标的序列化标志
 
 **核心方法：**
