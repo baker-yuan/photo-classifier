@@ -76,7 +76,7 @@ struct WelcomeView: View {
             VStack(spacing: 6) {
                 Text("⌘O 打开文件夹")
                 Text("子目录自动识别为标签分类")
-                Text("点击照片进入沉浸式打标")
+                Text("双击照片进入沉浸式打标")
             }
             .font(.caption)
             .foregroundStyle(.tertiary)
@@ -153,7 +153,8 @@ struct GridToolbar: View {
     @ViewBuilder
     private var selectAllButton: some View {
         if !vm.filteredPhotos.isEmpty {
-            let allSel = vm.selectedPhotos.count == vm.filteredPhotos.count
+            let filteredIDs = Set(vm.filteredPhotos.map(\.id))
+            let allSel = filteredIDs.isSubset(of: vm.selectedPhotos)
             Button(action: { allSel ? vm.deselectAll() : vm.selectAll() }) {
                 Label(allSel ? "取消全选" : "全选",
                       systemImage: allSel ? "square" : "checkmark.square")
@@ -203,7 +204,8 @@ struct SidebarView: View {
                 ShortcutRow(key: "⌘O", desc: "打开文件夹")
                 ShortcutRow(key: "⌘A", desc: "全选照片")
                 ShortcutRow(key: "⌘D", desc: "取消选择")
-                ShortcutRow(key: "点击", desc: "进入沉浸打标")
+                ShortcutRow(key: "单击", desc: "选中照片")
+                ShortcutRow(key: "双击", desc: "进入沉浸打标")
                 ShortcutRow(key: "⌘+点击", desc: "多选照片")
                 ShortcutRow(key: "多选按钮", desc: "切换多选模式")
                 ShortcutRow(key: "右键", desc: "快速分类菜单")
@@ -383,7 +385,7 @@ struct StatusBar: View {
                 .foregroundStyle(.secondary)
             Spacer()
             if !vm.photos.isEmpty {
-                Text("点击图片沉浸打标 | ⌘+点击多选 | 右键快速分类")
+                Text("单击选中 | 双击沉浸打标 | ⌘+点击多选 | 右键快速分类")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }

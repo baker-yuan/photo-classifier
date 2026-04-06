@@ -20,17 +20,14 @@ struct PhotoGridView: View {
                             isSelected: vm.selectedPhotos.contains(photo.id),
                             showCheckbox: vm.isSelectionMode
                         )
+                        .onTapGesture(count: 2) {
+                            vm.openDetail(for: photo.id)
+                        }
                         .onTapGesture(count: 1) {
-                            if vm.isSelectionMode {
-                                vm.toggleSelection(photo.id, extend: true)
-                            } else {
-                                let extend = NSEvent.modifierFlags.contains(.shift) || NSEvent.modifierFlags.contains(.command)
-                                if extend {
-                                    vm.toggleSelection(photo.id, extend: true)
-                                } else {
-                                    vm.openDetail(for: photo.id)
-                                }
-                            }
+                            let extend = vm.isSelectionMode
+                                || NSEvent.modifierFlags.contains(.shift)
+                                || NSEvent.modifierFlags.contains(.command)
+                            vm.toggleSelection(photo.id, extend: extend)
                         }
                         .contextMenu {
                             contextMenuItems(for: photo)
