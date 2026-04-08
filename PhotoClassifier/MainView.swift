@@ -28,8 +28,7 @@ struct MainView: View {
             SidebarView(selection: $sidebarSelection, showAddTag: $showAddTag, newTagText: $newTagText)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
                 .onChange(of: sidebarSelection) { newValue in
-                    guard let value = newValue else { return }
-                    vm.filterTag = (value == "全部") ? nil : value
+                    vm.filterTag = (newValue == "全部") ? nil : newValue
                     vm.deselectAll()
                 }
         } detail: {
@@ -238,30 +237,32 @@ struct SidebarView: View {
         List(selection: $selection) {
             if let tree = vm.directoryTree {
                 Section("目录") {
-                    DirectoryRow(node: tree, isSelected: vm.currentDirectory?.path == tree.url.path)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selection = "全部"
-                            vm.selectWorkingDirectory(tree.url)
+                    Button {
+                        selection = "全部"
+                        vm.selectWorkingDirectory(tree.url)
+                    } label: {
+                        DirectoryRow(node: tree, isSelected: vm.currentDirectory?.path == tree.url.path)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button("在 Finder 中显示") {
+                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: tree.url.path)
                         }
+                    }
+                    ForEach(tree.children) { child in
+                        Button {
+                            selection = "全部"
+                            vm.selectWorkingDirectory(child.url)
+                        } label: {
+                            DirectoryRow(node: child, isSelected: vm.currentDirectory?.path == child.url.path)
+                                .padding(.leading, 12)
+                        }
+                        .buttonStyle(.plain)
                         .contextMenu {
                             Button("在 Finder 中显示") {
-                                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: tree.url.path)
+                                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: child.url.path)
                             }
                         }
-                    ForEach(tree.children) { child in
-                        DirectoryRow(node: child, isSelected: vm.currentDirectory?.path == child.url.path)
-                            .contentShape(Rectangle())
-                            .padding(.leading, 12)
-                            .onTapGesture {
-                                selection = "全部"
-                                vm.selectWorkingDirectory(child.url)
-                            }
-                            .contextMenu {
-                                Button("在 Finder 中显示") {
-                                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: child.url.path)
-                                }
-                            }
                     }
                 }
             }
