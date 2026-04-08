@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainView: View {
     @EnvironmentObject var vm: ClassifierViewModel
+    @State private var sidebarSelection: String? = "全部"
     @State private var showAddTag = false
     @State private var newTagText = ""
 
@@ -24,8 +25,13 @@ struct MainView: View {
 
     private var mainContent: some View {
         NavigationSplitView {
-            SidebarView(showAddTag: $showAddTag, newTagText: $newTagText)
+            SidebarView(selection: $sidebarSelection, showAddTag: $showAddTag, newTagText: $newTagText)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
+                .onChange(of: sidebarSelection) { newValue in
+                    guard let value = newValue else { return }
+                    vm.filterTag = (value == "全部") ? nil : value
+                    vm.deselectAll()
+                }
         } detail: {
             VStack(spacing: 0) {
                 GridToolbar()
@@ -224,16 +230,20 @@ struct GridToolbar: View {
 
 struct SidebarView: View {
     @EnvironmentObject var vm: ClassifierViewModel
+    @Binding var selection: String?
     @Binding var showAddTag: Bool
     @Binding var newTagText: String
 
     var body: some View {
-        List {
+        List(selection: $selection) {
             if let tree = vm.directoryTree {
                 Section("目录") {
                     DirectoryRow(node: tree, isSelected: vm.currentDirectory?.path == tree.url.path)
                         .contentShape(Rectangle())
-                        .onTapGesture { vm.selectWorkingDirectory(tree.url) }
+                        .onTapGesture {
+                            selection = "全部"
+                            vm.selectWorkingDirectory(tree.url)
+                        }
                         .contextMenu {
                             Button("在 Finder 中显示") {
                                 NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: tree.url.path)
@@ -243,7 +253,10 @@ struct SidebarView: View {
                         DirectoryRow(node: child, isSelected: vm.currentDirectory?.path == child.url.path)
                             .contentShape(Rectangle())
                             .padding(.leading, 12)
-                            .onTapGesture { vm.selectWorkingDirectory(child.url) }
+                            .onTapGesture {
+                                selection = "全部"
+                                vm.selectWorkingDirectory(child.url)
+                            }
                             .contextMenu {
                                 Button("在 Finder 中显示") {
                                     NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: child.url.path)
@@ -254,13 +267,8 @@ struct SidebarView: View {
             }
             Section("归类筛选") {
                 ForEach(vm.tagCounts, id: \.tag) { item in
-                    TagFilterRow(tag: item.tag, count: item.count, isSelected: isTagSelected(item.tag))
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            let newFilter: String? = (item.tag == "全部") ? nil : item.tag
-                            vm.filterTag = newFilter
-                            vm.deselectAll()
-                        }
+                    TagFilterRow(tag: item.tag, count: item.count)
+                        .tag(item.tag)
                         .contextMenu {
                             if item.tag != "全部" && item.tag != "未归类", let dir = vm.currentDirectory {
                                 Button("在 Finder 中显示") {
@@ -302,11 +310,6 @@ struct SidebarView: View {
             Button("取消", role: .cancel) { newTagText = "" }
         }
     }
-
-    private func isTagSelected(_ tag: String) -> Bool {
-        if tag == "全部" { return vm.filterTag == nil }
-        return vm.filterTag == tag
-    }
 }
 
 struct DirectoryRow: View {
@@ -323,14 +326,12 @@ struct DirectoryRow: View {
         }
         .fontWeight(isSelected ? .semibold : .regular)
         .foregroundStyle(isSelected ? Color.accentColor : .primary)
-        .listRowBackground(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
     }
 }
 
 struct TagFilterRow: View {
     let tag: String
     let count: Int
-    let isSelected: Bool
 
     var body: some View {
         Label {
@@ -346,8 +347,6 @@ struct TagFilterRow: View {
             Image(systemName: iconName)
                 .foregroundStyle(color)
         }
-        .fontWeight(isSelected ? .semibold : .regular)
-        .listRowBackground(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
     }
 
     private var iconName: String {

@@ -15,6 +15,7 @@ struct PhotoDetailView: View {
     @State private var isSeeking: Bool = false
     @State private var timeObserver: Any?
     @State private var endObserver: NSObjectProtocol?
+    @State private var exifInfo: ExifInfo?
 
     var body: some View {
         ZStack {
@@ -238,6 +239,9 @@ struct PhotoDetailView: View {
             if vm.currentDetailPhoto?.isVideo == true {
                 videoProgressBar
             }
+            if let exif = exifInfo, vm.currentDetailPhoto?.isVideo != true {
+                exifBar(exif)
+            }
             HStack(spacing: 12) {
                 Text("移动到:")
                     .font(.callout)
@@ -270,6 +274,47 @@ struct PhotoDetailView: View {
         ForEach(Array(vm.availableTags.enumerated()), id: \.offset) { idx, tag in
             ImmersiveTagButton(tag: tag, index: idx)
         }
+    }
+
+    private func exifBar(_ exif: ExifInfo) -> some View {
+        HStack(spacing: 16) {
+            if let camera = exif.cameraDisplay {
+                exifChip(icon: "camera", text: camera)
+            }
+            if let lens = exif.lensModel {
+                exifChip(icon: "camera.metering.spot", text: lens)
+            }
+            if let fl = exif.focalLengthDisplay {
+                exifChip(icon: "scope", text: fl)
+            }
+            if let ap = exif.apertureDisplay {
+                exifChip(icon: "circle.circle", text: ap)
+            }
+            if let ss = exif.shutterDisplay {
+                exifChip(icon: "timer", text: ss)
+            }
+            if let iso = exif.isoDisplay {
+                exifChip(icon: "sun.max", text: iso)
+            }
+            if let res = exif.resolutionDisplay {
+                exifChip(icon: "rectangle.split.3x3", text: res)
+            }
+            if let date = exif.dateTaken {
+                exifChip(icon: "calendar", text: date)
+            }
+            Spacer()
+        }
+    }
+
+    private func exifChip(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+            Text(text)
+                .font(.caption2)
+                .lineLimit(1)
+        }
+        .foregroundStyle(.white.opacity(0.6))
     }
 
     private var moveToRootBtn: some View {
@@ -398,6 +443,7 @@ struct PhotoDetailView: View {
 
     private func loadMedia() {
         fullImage = nil
+        exifInfo = nil
         cleanupPlayer()
         currentTime = 0
         duration = 0
@@ -433,7 +479,11 @@ struct PhotoDetailView: View {
             let url = photo.url
             DispatchQueue.global(qos: .userInitiated).async {
                 let img = NSImage(contentsOf: url)
-                DispatchQueue.main.async { fullImage = img }
+                let exif = ExifInfo.read(from: url)
+                DispatchQueue.main.async {
+                    fullImage = img
+                    exifInfo = exif
+                }
             }
         }
     }
