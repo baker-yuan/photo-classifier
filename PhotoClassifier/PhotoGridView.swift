@@ -9,7 +9,9 @@ struct PhotoGridView: View {
 
     var body: some View {
         ScrollView {
-            if vm.filteredPhotos.isEmpty {
+            if vm.isLoading {
+                loadingState
+            } else if vm.filteredPhotos.isEmpty {
                 emptyState
             } else {
                 LazyVGrid(columns: columns, spacing: 2) {
@@ -39,6 +41,17 @@ struct PhotoGridView: View {
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .animation(.easeInOut(duration: 0.2), value: vm.thumbnailSize)
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.large)
+            Text("加载中…")
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 100)
     }
 
     private var emptyState: some View {

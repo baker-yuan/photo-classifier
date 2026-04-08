@@ -21,6 +21,7 @@ final class ClassifierViewModel: ObservableObject {
     @Published var recentDirectories: [URL] = []
     @Published var projectRoot: URL?
     @Published var directoryTree: DirectoryNode?
+    @Published var isLoading = false
 
     private static let recentBookmarksKey = "recentDirectoryBookmarks"
     private static let maxRecent = 10
@@ -192,6 +193,7 @@ final class ClassifierViewModel: ObservableObject {
         let myGeneration = loadGeneration
 
         currentDirectory = directory
+        isLoading = true
         if !preserveState {
             photos = []
             selectedPhotos = []
@@ -254,6 +256,7 @@ final class ClassifierViewModel: ObservableObject {
 
                 DispatchQueue.main.async {
                     guard self.loadGeneration == myGeneration else { return }
+                    self.isLoading = false
                     self.availableTags = tags
                     self.photos = allPhotos
                     let untagged = allPhotos.filter { $0.tag == nil }.count
@@ -263,6 +266,7 @@ final class ClassifierViewModel: ObservableObject {
             } catch {
                 DispatchQueue.main.async {
                     guard self.loadGeneration == myGeneration else { return }
+                    self.isLoading = false
                     self.statusMessage = "加载失败: \(error.localizedDescription)"
                     completion?()
                 }
