@@ -8,35 +8,37 @@ struct PhotoGridView: View {
     }
 
     var body: some View {
-        ScrollView {
+        Group {
             if vm.isLoading {
                 loadingState
             } else if vm.filteredPhotos.isEmpty {
                 emptyState
             } else {
-                LazyVGrid(columns: columns, spacing: 2) {
-                    ForEach(vm.filteredPhotos) { photo in
-                        ThumbnailView(
-                            photo: photo,
-                            size: vm.thumbnailSize,
-                            isSelected: vm.selectedPhotos.contains(photo.id),
-                            showCheckbox: vm.isSelectionMode
-                        )
-                        .onTapGesture(count: 2) {
-                            vm.openDetail(for: photo.id)
-                        }
-                        .onTapGesture(count: 1) {
-                            let extend = vm.isSelectionMode
-                                || NSEvent.modifierFlags.contains(.shift)
-                                || NSEvent.modifierFlags.contains(.command)
-                            vm.toggleSelection(photo.id, extend: extend)
-                        }
-                        .contextMenu {
-                            contextMenuItems(for: photo)
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 2) {
+                        ForEach(vm.filteredPhotos) { photo in
+                            ThumbnailView(
+                                photo: photo,
+                                size: vm.thumbnailSize,
+                                isSelected: vm.selectedPhotos.contains(photo.id),
+                                showCheckbox: vm.isSelectionMode
+                            )
+                            .onTapGesture(count: 2) {
+                                vm.openDetail(for: photo.id)
+                            }
+                            .onTapGesture(count: 1) {
+                                let extend = vm.isSelectionMode
+                                    || NSEvent.modifierFlags.contains(.shift)
+                                    || NSEvent.modifierFlags.contains(.command)
+                                vm.toggleSelection(photo.id, extend: extend)
+                            }
+                            .contextMenu {
+                                contextMenuItems(for: photo)
+                            }
                         }
                     }
+                    .padding(4)
                 }
-                .padding(4)
             }
         }
         .background(Color(nsColor: .controlBackgroundColor))
@@ -44,14 +46,14 @@ struct PhotoGridView: View {
     }
 
     private var loadingState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
             ProgressView()
-                .controlSize(.large)
+                .scaleEffect(2.0)
             Text("加载中…")
+                .font(.title3)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 100)
     }
 
     private var emptyState: some View {
@@ -63,7 +65,6 @@ struct PhotoGridView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 100)
     }
 
     @ViewBuilder
