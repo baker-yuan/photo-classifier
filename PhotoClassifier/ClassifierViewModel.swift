@@ -19,6 +19,8 @@ final class ClassifierViewModel: ObservableObject {
     @Published var detailToast: String?
     @Published var isSelectionMode = false
     @Published var recentDirectories: [URL] = []
+    @Published var projectRoot: URL?
+    @Published var directoryTree: DirectoryNode?
 
     private static let recentBookmarksKey = "recentDirectoryBookmarks"
     private static let maxRecent = 10
@@ -93,7 +95,50 @@ final class ClassifierViewModel: ObservableObject {
             accessedSecurityScopedURL = url
         }
         addToRecent(url)
+        openProject(url)
+    }
+
+    // MARK: - Project / Multi-level Directory
+
+    func openProject(_ url: URL) {
+        projectRoot = url
+        ThumbnailCache.shared.clear()
         loadDirectory(url)
+        refreshDirectoryTree()
+    }
+
+    func selectWorkingDirectory(_ url: URL) {
+        guard url.path != currentDirectory?.path else { return }
+        loadDirectory(url)
+    }
+
+    func refreshDirectoryTree() {
+        guard let root = projectRoot else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let tree = self?.buildDirectoryTree(at: root)
+            DispatchQueue.main.async {
+                self?.directoryTree = tree
+            }
+        }
+    }
+
+    /// Only scans one level: root + immediate subdirectories (2-level tree).
+    private func buildDirectoryTree(at url: URL) -> DirectoryNode {
+        let fm = FileManager.default
+        var children: [DirectoryNode] = []
+        if let contents = try? fm.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            for item in contents.sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }) {
+                let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+                if isDir {
+                    children.append(DirectoryNode(url: item, name: item.lastPathComponent, children: []))
+                }
+            }
+        }
+        return DirectoryNode(url: url, name: url.lastPathComponent, children: children)
     }
 
     deinit {
@@ -137,7 +182,7 @@ final class ClassifierViewModel: ObservableObject {
             accessedSecurityScopedURL?.stopAccessingSecurityScopedResource()
             accessedSecurityScopedURL = nil
             addToRecent(url)
-            loadDirectory(url)
+            openProject(url)
         }
     }
 
@@ -152,7 +197,6 @@ final class ClassifierViewModel: ObservableObject {
             isSelectionMode = false
         }
         availableTags = []
-        ThumbnailCache.shared.clear()
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
@@ -239,6 +283,7 @@ final class ClassifierViewModel: ObservableObject {
                 }
             }
         }
+        refreshDirectoryTree()
     }
 
     // MARK: - Selection
@@ -412,6 +457,7 @@ final class ClassifierViewModel: ObservableObject {
             }
             availableTags.append(t)
             statusMessage = "已创建标签「\(t)」"
+            refreshDirectoryTree()
         } catch {
             statusMessage = "创建标签失败: \(error.localizedDescription)"
         }
@@ -443,7 +489,7 @@ final class ClassifierViewModel: ObservableObject {
         guard !isDetailTagging else { return }
         guard let dir = currentDirectory else { return }
         guard let photo = currentDetailPhoto, photo.tag != tag else { return }
-        guard let photoIdx = photos.firstIndex(where: { $0.id == photo.id }) else { return }
+        guard photos.contains(where: { $0.id == photo.id }) else { return }
 
         isDetailTagging = true
         let fm = FileManager.default
@@ -496,7 +542,7 @@ final class ClassifierViewModel: ObservableObject {
         guard !isDetailTagging else { return }
         guard let dir = currentDirectory else { return }
         guard let photo = currentDetailPhoto, photo.tag != nil else { return }
-        guard let photoIdx = photos.firstIndex(where: { $0.id == photo.id }) else { return }
+        guard photos.contains(where: { $0.id == photo.id }) else { return }
 
         isDetailTagging = true
         let fm = FileManager.default
