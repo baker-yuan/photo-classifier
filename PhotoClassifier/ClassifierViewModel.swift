@@ -27,6 +27,7 @@ final class ClassifierViewModel: ObservableObject {
 
     private var isDetailTagging = false
     private var toastGeneration = 0
+    private var loadGeneration = 0
     private var accessedSecurityScopedURL: URL?
 
     private let imageExtensions: Set<String> = [
@@ -187,6 +188,9 @@ final class ClassifierViewModel: ObservableObject {
     }
 
     func loadDirectory(_ directory: URL, preserveState: Bool = false, completion: (() -> Void)? = nil) {
+        loadGeneration += 1
+        let myGeneration = loadGeneration
+
         currentDirectory = directory
         if !preserveState {
             photos = []
@@ -249,6 +253,7 @@ final class ClassifierViewModel: ObservableObject {
                 }
 
                 DispatchQueue.main.async {
+                    guard self.loadGeneration == myGeneration else { return }
                     self.availableTags = tags
                     self.photos = allPhotos
                     let untagged = allPhotos.filter { $0.tag == nil }.count
@@ -257,6 +262,7 @@ final class ClassifierViewModel: ObservableObject {
                 }
             } catch {
                 DispatchQueue.main.async {
+                    guard self.loadGeneration == myGeneration else { return }
                     self.statusMessage = "加载失败: \(error.localizedDescription)"
                     completion?()
                 }
