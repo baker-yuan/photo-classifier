@@ -16,12 +16,50 @@ struct PhotoDetailView: View {
     @State private var timeObserver: Any?
     @State private var endObserver: NSObjectProtocol?
     @State private var exifInfo: ExifInfo?
+    @State private var zoomScale: CGFloat = 1.0
+    @State private var lastZoomScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
 
     var body: some View {
         ZStack {
             Color.black
 
             mediaContent
+                .scaleEffect(zoomScale)
+                .offset(offset)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            zoomScale = min(max(lastZoomScale * value, 1.0), 10.0)
+                        }
+                        .onEnded { _ in
+                            if zoomScale < 1.05 {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    zoomScale = 1.0
+                                    offset = .zero
+                                    lastOffset = .zero
+                                }
+                                lastZoomScale = 1.0
+                            } else {
+                                lastZoomScale = zoomScale
+                            }
+                        }
+                )
+                .simultaneousGesture(
+                    DragGesture()
+                        .onChanged { value in
+                            guard zoomScale > 1.0 else { return }
+                            offset = CGSize(
+                                width: lastOffset.width + value.translation.width,
+                                height: lastOffset.height + value.translation.height
+                            )
+                        }
+                        .onEnded { _ in
+                            guard zoomScale > 1.0 else { return }
+                            lastOffset = offset
+                        }
+                )
 
             navigationOverlay
 
@@ -35,18 +73,33 @@ struct PhotoDetailView: View {
                 }
             }
 
-            // Toast overlay — prominent visual feedback after tagging
             toastOverlay
         }
         .onAppear { loadMedia() }
         .onDisappear { cleanupPlayer() }
-        // Watch the actual photo identity, not just the index.
-        // This correctly reloads media when:
-        //  - User navigates (detailIndex changes → different photo id)
-        //  - Photo drops out of filtered list after tagging (same index → different photo id)
         .onChange(of: vm.currentDetailPhoto?.id) { _ in loadMedia() }
         .onReceive(NotificationCenter.default.publisher(for: .detailKeyEvent)) { note in
             if let key = note.object as? String { handleKey(key) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .detailScrollEvent)) { note in
+            if let info = note.userInfo,
+               let delta = info["delta"] as? CGFloat,
+               let precise = info["precise"] as? Bool {
+                handleScrollZoom(delta: delta, precise: precise)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .detailDoubleClick)) { _ in
+            withAnimation(.easeInOut(duration: 0.25)) {
+                if zoomScale > 1.0 {
+                    zoomScale = 1.0
+                    lastZoomScale = 1.0
+                    offset = .zero
+                    lastOffset = .zero
+                } else {
+                    zoomScale = 3.0
+                    lastZoomScale = 3.0
+                }
+            }
         }
     }
 
@@ -257,7 +310,7 @@ struct PhotoDetailView: View {
 
                 Spacer()
 
-                Text("← → 切换  ⌘+数字 归类  ESC 退出")
+                Text("← → 切换  双击放大  +/- 缩放  ⌘+数字 归类  ESC 退出")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.3))
             }
@@ -403,6 +456,31 @@ struct PhotoDetailView: View {
         case "right": vm.nextPhoto()
         case "escape": closeDetail()
         case "space": toggleControls()
+        case "zoomIn":
+            withAnimation(.easeOut(duration: 0.15)) {
+                zoomScale = min(zoomScale * 1.5, 10.0)
+                lastZoomScale = zoomScale
+            }
+        case "zoomOut":
+            withAnimation(.easeOut(duration: 0.15)) {
+                let newScale = zoomScale / 1.5
+                if newScale <= 1.05 {
+                    zoomScale = 1.0
+                    lastZoomScale = 1.0
+                    offset = .zero
+                    lastOffset = .zero
+                } else {
+                    zoomScale = newScale
+                    lastZoomScale = newScale
+                }
+            }
+        case "zoomReset":
+            withAnimation(.easeOut(duration: 0.15)) {
+                zoomScale = 1.0
+                lastZoomScale = 1.0
+                offset = .zero
+                lastOffset = .zero
+            }
         default:
             if let num = Int(key), num >= 1, num <= vm.availableTags.count {
                 let tag = vm.availableTags[num - 1]
@@ -439,6 +517,25 @@ struct PhotoDetailView: View {
         showControls = true
     }
 
+    private func handleScrollZoom(delta: CGFloat, precise: Bool) {
+        let adjustedDelta = precise ? -delta : delta
+        let sensitivity: CGFloat = precise ? 0.005 : 0.03
+        let factor = 1.0 + adjustedDelta * sensitivity
+        let newScale = min(max(zoomScale * factor, 1.0), 10.0)
+
+        if newScale <= 1.02 {
+            withAnimation(.easeOut(duration: 0.15)) {
+                zoomScale = 1.0
+                lastZoomScale = 1.0
+                offset = .zero
+                lastOffset = .zero
+            }
+        } else {
+            zoomScale = newScale
+            lastZoomScale = newScale
+        }
+    }
+
     // MARK: - Helpers
 
     private func loadMedia() {
@@ -448,6 +545,10 @@ struct PhotoDetailView: View {
         currentTime = 0
         duration = 0
         isPlaying = true
+        zoomScale = 1.0
+        lastZoomScale = 1.0
+        offset = .zero
+        lastOffset = .zero
         guard let photo = vm.currentDetailPhoto else { return }
 
         if photo.isVideo {
@@ -565,88 +666,5 @@ struct PlayerView: NSViewRepresentable {
 
     func updateNSView(_ nsView: AVPlayerView, context: Context) {
         nsView.player = player
-    }
-}
-
-// MARK: - Full-Screen Window Manager
-
-extension Notification.Name {
-    static let detailKeyEvent = Notification.Name("detailKeyEvent")
-}
-
-final class FullScreenDetailWindow {
-    static let shared = FullScreenDetailWindow()
-    private var window: NSWindow?
-    private var eventMonitor: Any?
-    private init() {}
-
-    func show(vm: ClassifierViewModel) {
-        close()
-
-        guard let screen = NSApp.keyWindow?.screen ?? NSScreen.main else { return }
-
-        let win = _FullScreenPanel(
-            contentRect: screen.frame,
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false
-        )
-        win.setFrame(screen.frame, display: true)
-        win.backgroundColor = .black
-        win.isOpaque = true
-        win.hasShadow = false
-        win.level = .normal
-
-        let hosting = NSHostingView(
-            rootView: PhotoDetailView()
-                .environmentObject(vm)
-        )
-        win.contentView = hosting
-        win.makeKeyAndOrderFront(nil)
-
-        NSApp.presentationOptions = [.autoHideMenuBar, .autoHideDock]
-
-        // Intercept ⌘+number BEFORE the menu system handles it.
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard self?.window?.isKeyWindow == true else { return event }
-            if event.modifierFlags.contains(.command),
-               let chars = event.charactersIgnoringModifiers, chars.count == 1,
-               let num = chars.first?.wholeNumberValue, num >= 1, num <= 9 {
-                NotificationCenter.default.post(name: .detailKeyEvent, object: "\(num)")
-                return nil // consumed
-            }
-            return event
-        }
-
-        self.window = win
-    }
-
-    func close() {
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
-        }
-        window?.orderOut(nil)
-        window = nil
-        NSApp.presentationOptions = []
-    }
-}
-
-private class _FullScreenPanel: NSWindow {
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
-
-    override func keyDown(with event: NSEvent) {
-        let key: String?
-        switch event.keyCode {
-        case 123: key = "left"
-        case 124: key = "right"
-        case 53:  key = "escape"
-        case 49:  key = "space"
-        default:  key = nil
-        }
-        if let key = key {
-            NotificationCenter.default.post(name: .detailKeyEvent, object: key)
-        }
     }
 }
